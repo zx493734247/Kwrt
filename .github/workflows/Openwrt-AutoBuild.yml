@@ -221,6 +221,18 @@ jobs:
         clean: ${{ contains(github.event.action, 'nocache') || contains(github.event.inputs.param, 'nocache') }}
         prefix: ${{ github.workspace }}/openwrt
 
+    - name: Remove incompatible shortcut-fe kernel patch
+      run: |
+        cd openwrt
+        rm -f target/linux/generic/hack-6.12/953-net-patch-linux-kernel-to-support-shortcut-fe.patch
+        if [ -f target/linux/generic/hack-6.12/953-net-patch-linux-kernel-to-support-shortcut-fe.patch ]; then
+          echo "::error::shortcut-fe 内核补丁仍存在，无法继续编译"
+          exit 1
+        fi
+        echo "已确认移除 953 shortcut-fe 内核补丁"
+        # 上次 kernel-headers 失败后可能留下损坏缓存，强制清理
+        rm -rf build_dir/toolchain-*/linux-* 2>/dev/null || true
+
     - name: SSH connection to Actions
       uses: kiddin9/debugger-action@master
       if: contains(github.event.action, 'ssh') || contains(github.event.inputs.param, 'ssh')
