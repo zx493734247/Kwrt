@@ -249,6 +249,38 @@ jobs:
         Emoji=("🎉" "🤞" "✨" "🎁" "🎈" "🎄" "🎨" "💋" "🍓" "🍕" "🍉" "💐" "🌴" "🚀" "🛸" "🗽" "⛅" "🌈" "🔥" "⛄" "🐶" "🏅" "🦄" "🐤")
         echo "EMOJI=${Emoji[$[$RANDOM % ${#Emoji[@]}]]}" >> $GITHUB_ENV
 
+    - name: Check HC5962 firmware size
+      if: matrix.target == 'ramips_mt7621'
+      run: |
+        # HC5962 (hiwifi_hc5962) 闪存上限 32MB = 32768KB
+        MAX_KB=32768
+        WARN_KB=30720
+        OVERFLOW=0
+        echo "## HC5962 固件大小检查" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| 文件 | 大小 (KB) | 状态 |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+        shopt -s nullglob
+        for img in openwrt/bin/targets/ramips/mt7621/*hiwifi_hc5962*; do
+          [ -f "$img" ] || continue
+          size_kb=$(( $(stat -c%s "$img") / 1024 ))
+          if [ "$size_kb" -gt "$MAX_KB" ]; then
+            status="❌ 超出 ${MAX_KB}KB 上限"
+            OVERFLOW=1
+          elif [ "$size_kb" -gt "$WARN_KB" ]; then
+            status="⚠️ 接近上限 (>${WARN_KB}KB)"
+          else
+            status="✅ 正常"
+          fi
+          echo "| $(basename "$img") | ${size_kb} | ${status} |" >> $GITHUB_STEP_SUMMARY
+          echo "$(basename "$img"): ${size_kb}KB - ${status}"
+        done
+        if [ "$OVERFLOW" -eq 1 ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**警告：固件已超过 HC5962 的 32MB 闪存限制，刷机可能失败。请精简软件包或关闭 PassWall2 部分组件。**" >> $GITHUB_STEP_SUMMARY
+          echo "::warning title=HC5962 固件过大::固件超过 32768KB (32MB) 限制，请精简软件包后重新编译"
+        fi
+
     - name: Deploy imagebuilder to server
       uses: easingthemes/ssh-deploy@main
       if: env.SSH_PRIVATE_KEY && ! contains(github.event.action, 'noser')
