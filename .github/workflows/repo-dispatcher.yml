@@ -1,9 +1,6 @@
 #=================================================
-# https://github.com/P3TERX/Actions-OpenWrt
-# Description: Build OpenWrt using GitHub Actions
-# Lisence: MIT
-# Author: P3TERX
-# Blog: https://p3terx.com
+# 可选：通过此工作流间接启动 Build OpenWrt
+# 推荐直接运行 Build OpenWrt 工作流
 #=================================================
 
 name: Repo Dispatcher
@@ -16,52 +13,29 @@ on:
         required: false
         default: ''
 
+permissions:
+  actions: write
+  contents: read
+
 env:
-  TOKEN_KIDDIN9: ${{ secrets.TOKEN_KIDDIN9 }}
   TZ: Asia/Shanghai
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@main
-
-    - name: cancel running workflows
-      uses: styfle/cancel-workflow-action@main
-      if: contains(github.event.inputs.param, 'cw')
+    - name: Trigger Build OpenWrt (HC5962)
+      uses: actions/github-script@v7
       with:
-        workflow_id: all
-        access_token: ${{ secrets.TOKEN_KIDDIN9 }}
-        force_cancel: true
-
-    - name: Load Settings.ini
-      run: |
-        source "${GITHUB_WORKSPACE}/devices/common/settings.ini"
-        if [ -f "devices/ramips_mt7621/settings.ini" ]; then
-          source "${GITHUB_WORKSPACE}/devices/ramips_mt7621/settings.ini"
-        fi
-        echo "REPO_URL=${REPO_URL}" >> $GITHUB_ENV
-        echo "REPO_BRANCH=${REPO_BRANCH}" >> $GITHUB_ENV
-
-    - name: Trigger Packages Update
-      continue-on-error: true
-      run: |
-        gitdate=$(curl -H "Authorization: token ${{ secrets.TOKEN_KIDDIN9 }}" -s "https://api.github.com/repos/kiddin9/op-packages/actions/runs" | jq -r '.workflow_runs[0].created_at')
-        gitdate=$(date -d "$gitdate" +%s)
-        now=$(date -d "$(date)" +%s)
-        if [[ $(expr $gitdate + 120) < $now ]]; then
-        curl -X POST https://api.github.com/repos/kiddin9/op-packages/dispatches \
-        -H "Accept: application/vnd.github.everest-preview+json" \
-        -H "Authorization: token ${{ secrets.TOKEN_KIDDIN9 }}" \
-        --data '{"event_type": "update"}'
-        fi
-
-    - name: Trigger Compile (HC5962 / ramips_mt7621)
-      run: |
-        sudo timedatectl set-timezone "$TZ"
-        curl \
-          -X POST https://api.github.com/repos/${{ github.repository }}/dispatches \
-          -H "Accept: application/vnd.github.everest-preview+json" \
-          -H "Authorization: token ${{ secrets.TOKEN_KIDDIN9 }}" \
-          -d '{"event_type": "ramips_mt7621 ${{ github.event.inputs.param }}", "client_payload": {"target": "ramips_mt7621"}}'
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'Openwrt-AutoBuild.yml',
+            ref: context.ref,
+            inputs: {
+              target: 'ramips_mt7621',
+              param: '${{ github.event.inputs.param }}'
+            }
+          });
+          core.info('已触发 Build OpenWrt，请在 Actions 列表中查看编译进度');
