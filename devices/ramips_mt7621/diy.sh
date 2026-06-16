@@ -16,6 +16,9 @@ sed -i "s/--max-leb-cnt=96/--max-leb-cnt=128/g" target/linux/ramips/image/mt7621
 rm -f target/linux/generic/hack-6.12/953-net-patch-linux-kernel-to-support-shortcut-fe.patch
 rm -rf feeds/kiddin9/shortcut-fe package/feeds/kiddin9/shortcut-fe 2>/dev/null || true
 
+# natflow 20260531 与 kernel 6.12.92 编译不兼容 (Werror unused-variable)
+rm -rf feeds/kiddin9/natflow package/feeds/kiddin9/natflow 2>/dev/null || true
+
 # 固定 sing-box 版本为 1.12.23
 for singbox_mk in feeds/kiddin9/sing-box/Makefile package/feeds/kiddin9/sing-box/Makefile; do
 	[ -f "$singbox_mk" ] || continue
